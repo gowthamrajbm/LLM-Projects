@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}Home - MySite{% endblock %}
+
+{% block content %}
+<div class="flex h-screen bg-white">
+    <div class="w-64 max-w-[300px]">
+        <div class="p-2 font-bold">
+            <h5>PostgreSQL DB Metadata</h5>
+        </div>
+        <ol class="divide-y divide-solid">
+            {% for table in metadata.tables %}
+            <div class="px-2 py-1">
+                <button class="focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm cursor-pointer" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                    &#x1F5D2;{{ table.name }}
+                </button>
+                <div style="display: none;">
+                <ul class="divide-y divide-dashed">
+                    {% for column in table.columns %}
+                        <li class="text-sm px-2 py-1">
+                            {{ column.name }}
+                        </li>
+                    {% endfor %}
+                </ul>
+                </div>
+            </div>
+            {% endfor %}
+        </ol>
+    </div>
+    <div class="flex-1 bg-gray-100">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 p-4">
+            {% for chart in charts %}
+                <div class="bg-white shadow-md rounded-lg p-4">
+                    <div id="chart-container{{ forloop.counter0 }}" style="width: 80%; margin: auto;">
+                        <h3 class="text-center font-bold text-md mb-4">{{ chart.title }}</h3>
+                        <canvas id="chart{{ forloop.counter0 }}"></canvas>
+                        <div id="single-value-container{{ forloop.counter0 }}" style="display: none;"></div>
+                    </div>
+                    <script type="text/javascript">
+                        renderChart(
+                            "chart{{ forloop.counter0 }}",
+                            {{ chart.data|safe }}
+                        );
+                    </script>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
