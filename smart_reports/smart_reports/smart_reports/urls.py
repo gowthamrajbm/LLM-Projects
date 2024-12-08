@@ -21,5 +21,6 @@ from . import views  # Import your views module
 urlpatterns = [
     path('', views.home_view, name='home'),  # For function-based view
     path('admin/', admin.site.urls),
+    path('search_query/', views.search_query, name='search_query'),
     # path('', HomeView.as_view(), name='home'),  # Uncomment for class-based view
 ]

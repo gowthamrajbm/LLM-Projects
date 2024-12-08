@@ -1,13 +1,14 @@
 function renderChart(containerId, chartData) {
-    console.log(chartData);
     try {
-        // Map human-readable chart types to Chart.js types
+        console.log(chartData)
+        // Map human-readable chart types to Chart.js types and custom rendering
         const chartTypeMap = {
             "bar chart": "bar",
             "line chart": "line",
             "pie chart": "pie",
             "doughnut": "doughnut",
-            "single value": "single value"
+            "single value": "single value",
+            "table": "table", // New table chart type
         };
 
         // Normalize chart type
@@ -15,37 +16,66 @@ function renderChart(containerId, chartData) {
         if (!normalizedType) {
             throw new Error(`Unsupported chart type: ${chartData.type}`);
         }
-
-        // Validate data structure
-        if (
-            !chartData.data ||
-            !Array.isArray(chartData.data.labels) ||
-            !Array.isArray(chartData.data.datasets)
-        ) {
-            throw new Error("Invalid data structure: Ensure 'labels' and 'datasets' are arrays.");
-        }
-
-        // Handle heatmap or single value separately
+        
+        const container = chartData.type === "table" ? document.getElementById(containerId+"-nc") : document.getElementById(containerId);
+        // Handle specific types of charts
         if (chartData.type === "heatmap" || chartData.type === "single value") {
             if (chartData.type === "heatmap") {
                 console.error("Heatmap rendering not supported by Chart.js. Please use a heatmap library.");
             } else {
-                const container = document.getElementById(containerId);
                 if (!container) {
                     throw new Error(`Container with id '${containerId}' not found.`);
                 }
-                container.nextElementSibling.innerHTML = `<div class="pt-4" style="font-size: 48px; text-align: center; font-weight: bold">${chartData.data.datasets[0]?.data[0] ?? "N/A"}</
-                div>`;
+                container.nextElementSibling.innerHTML = `<div class="pt-4" style="font-size: 48px; text-align: center; font-weight: bold">${chartData.data.datasets[0]?.data[0] ?? "N/A"}</div>`;
                 container.nextElementSibling.style.display = 'block';
                 container.style.display = 'none';
             }
             return;
         }
 
+        // Handle table chart rendering
+        if (chartData.type === "table") {
+            document.getElementById(containerId).style.display = "none";
+            if (!container) {
+                throw new Error(`Container with id '${containerId}' not found.`);
+            }
+
+            // Create table dynamically
+            let tableHTML = `<table class="min-w-full border-collapse border border-gray-200 text-sm text-left">
+                                <thead>
+                                    <tr>`;
+
+            // Add headers from labels
+            chartData.data.labels.forEach(label => {
+                tableHTML += `<th class="border border-gray-200 px-4 py-2">${label}</th>`;
+            });
+            tableHTML += `</tr></thead><tbody>`;
+
+            // Add rows from dataset data
+            //console.log(chartData.data.datasets[0].data)
+            chartData.data.datasets[0].data.forEach(dataset => {
+                tableHTML += `<tr>`;
+                if(!!dataset && dataset.constructor === Array)                    
+                    dataset.forEach(value => {
+                        tableHTML += `<td class="border border-gray-200 px-4 py-2">${value}</td>`;
+                    });
+                else
+                    tableHTML += `<td class="border border-gray-200 px-4 py-2">${dataset}</td>`;
+                
+                tableHTML += `</tr>`;
+            });
+
+            tableHTML += `</tbody></table>`;
+
+            // Insert table into the container
+            container.innerHTML = tableHTML;
+            return;
+        }
+
         // Color palette
         const colors = [
-            "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF", 
-            "#FF9F40", "#FFCD56", "#C9CBCF", "#8DD1E1", "#D35D6E"
+            "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF",
+            "#FF9F40", "#FFCD56", "#C9CBCF", "#8DD1E1", "#D35D6E",
         ];
 
         // Dynamically assign colors
@@ -79,57 +109,29 @@ function renderChart(containerId, chartData) {
                 responsive: true,
                 plugins: {
                     legend: {
-                        display: normalizedType !== "pie", // Hide legend for single-series pie charts
+                        display: true, // Ensure the legend is visible
+                        position: 'top', // Adjust the legend position
+                        labels: {
+                            font: {
+                                size: 12, // Adjust font size for readability
+                            },
+                            color: "#000", // Legend label color
+                        },
                     },
                 },
+                scales: normalizedType === 'bar' || normalizedType === 'line'
+                    ? {
+                          x: {
+                              beginAtZero: true,
+                          },
+                          y: {
+                              beginAtZero: true,
+                          },
+                      }
+                    : {}, // Scales only for bar/line charts
             },
         });
     } catch (error) {
         console.log("Error rendering chart:", error);
-    }
-}
-
-// Utility function to generate colors
-function generateColors(count) {
-    try {
-        if (typeof count !== 'number' || count <= 0) {
-            throw new Error('Invalid count for generating colors.');
-        }
-        const colors = [];
-        for (let i = 0; i < count; i++) {
-            colors.push(`rgba(${randomColor()}, ${randomColor()}, ${randomColor()}, 0.5)`);
-        }
-        return colors;
-    } catch (error) {
-        console.error(`Error generating colors: ${error.message}`);
-        throw error;
-    }
-}
-
-function randomColor() {
-    return Math.floor(Math.random() * 256);
-}
-
-// Utility function for heatmap colors
-function generateHeatmapColors(values) {
-    try {
-        if (!Array.isArray(values) || values.length === 0) {
-            throw new Error('Values must be a non-empty array for heatmap.');
-        }
-
-        const max = Math.max(...values);
-        const min = Math.min(...values);
-
-        if (max === min) {
-            throw new Error('All values are the same. Heatmap requires varying data.');
-        }
-
-        return values.map(value => {
-            const intensity = (value - min) / (max - min); // Normalize
-            return `rgba(255, ${255 - Math.round(255 * intensity)}, ${255 - Math.round(255 * intensity)}, 0.5)`;
-        });
-    } catch (error) {
-        console.error(`Error generating heatmap colors: ${error.message}`);
-        throw error;
     }
 }

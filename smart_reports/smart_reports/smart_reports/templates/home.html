@@ -6,7 +6,7 @@
 <div class="flex h-screen bg-white">
     <div class="w-64 max-w-[300px]">
         <div class="p-2 font-bold">
-            <h5>PostgreSQL DB Metadata</h5>
+            <h5>DB Tables</h5>
         </div>
         <ol class="divide-y divide-solid">
             {% for table in metadata.tables %}
@@ -28,23 +28,325 @@
         </ol>
     </div>
     <div class="flex-1 bg-gray-100">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 p-4">
-            {% for chart in charts %}
-                <div class="bg-white shadow-md rounded-lg p-4">
-                    <div id="chart-container{{ forloop.counter0 }}" style="width: 80%; margin: auto;">
-                        <h3 class="text-center font-bold text-md mb-4">{{ chart.title }}</h3>
-                        <canvas id="chart{{ forloop.counter0 }}"></canvas>
-                        <div id="single-value-container{{ forloop.counter0 }}" style="display: none;"></div>
-                    </div>
-                    <script type="text/javascript">
-                        renderChart(
-                            "chart{{ forloop.counter0 }}",
-                            {{ chart.data|safe }}
-                        );
-                    </script>
-                </div>
-            {% endfor %}
+        <!-- Tab Navigation -->
+        <div class="flex justify-center bg-white shadow-md">
+            <button 
+                id="home-tab" 
+                class="tab-button px-4 py-2 text-lg font-medium border-b-2 transition duration-300"
+            >
+                Home
+            </button>
+            <button 
+                id="explore-tab" 
+                class="tab-button px-4 py-2 text-lg font-medium border-b-2 transition duration-300 bg-blue-100"
+            >
+                Explore
+            </button>
         </div>
+    
+        <!-- Tab Content -->
+        <div id="home-content" class="tab-content hidden p-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                {% for chart in charts %}
+                    <div class="bg-white shadow-md rounded-lg p-4">
+                        <div id="chart-container{{ forloop.counter0 }}" style="width: 80%; margin: auto;">
+                            <h3 class="text-center font-bold text-md mb-4">{{ chart.title }}</h3>
+                            <canvas id="chart{{ forloop.counter0 }}"></canvas>
+                            <div id="single-value-container{{ forloop.counter0 }}" style="display: none;"></div>
+                        </div>
+                        <script type="text/javascript">
+                            renderChart(
+                                "chart{{ forloop.counter0 }}",
+                                {{ chart.data|safe }}
+                            );
+                        </script>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div id="explore-content" class="tab-content flex">
+            <div class="flex h-screen">
+                <!-- Main Content -->
+                <div class="flex-1 p-4 overflow-auto flex flex-col relative">
+                    <div class="w-full bg-white">
+                        <div class="relative flex items-center border-2 border-gray-300 rounded-lg shadow overflow-hidden">
+                            <div class="absolute flex px-3">
+                                <svg id="history-btn" class="h-6 w-6 text-gray-500 hover:cursor-pointer hover:text-gray-800"  width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <polyline points="12 8 12 12 14 14" />  <path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></svg>
+                         
+                              <div class="h-6 border-l border-slate-200 ml-2.5"></div>
+                            </div>
+                            <form class="w-full flex" id="search_query_form" method="post" onsubmit="handleSearchQuery(event)">
+                                {% csrf_token %}
+                                <input
+                                    type="text"
+                                    name="search_query"
+                                    id="search_query_input"
+                                    class="bg-transparent placeholder:text-slate-400 text-slate-700 text-sm border border-slate-200 rounded-md px-16 py-2 transition duration-300 ease focus:outline-none focus:border-slate-400 hover:border-slate-300 shadow-sm focus:shadow w-full p-4 text-lg focus:outline-none focus:ring-2 flex-1"
+                                    placeholder="Search query" />
+                        
+                                <button
+                                    class="absolute top-1 right-1 flex items-center rounded bg-slate-800 py-1 px-2.5 border border-transparent text-center text-sm text-white transition-all shadow-sm hover:shadow focus:bg-slate-700 focus:shadow-none active:bg-slate-700 hover:bg-slate-700 active:shadow-none disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none"
+                                    type="submit"
+                                    >
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4 mr-1.5">
+                                        <path fill-rule="evenodd" d="M9.965 11.026a5 5 0 1 1 1.06-1.06l2.755 2.754a.75.75 0 1 1-1.06 1.06l-2.755-2.754ZM10.5 7a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z" clip-rule="evenodd" />
+                                    </svg>
+                                
+                                    Search
+                                </button> 
+                            </form>
+                        </div>   
+                    </div>
+                    <div class="p-4" id="query-response-cont">
+                        
+                    </div>
+                    <div
+                        id="history-modal"
+                        class="hidden fixed inset-0 bg-gray-800 bg-opacity-25 flex items-center justify-center z-50"
+                    >
+                        <div class="bg-white p-6 rounded shadow-lg w-[600px] max-h-[80vh] overflow-y-auto">
+                            <h2 class="text-xl font-bold mb-4">Query Search History</h2>
+                            <ul id="query-list" class="divide-y-2 divide-dashed">
+                                <li class="bg-gray-100 px-4 py-2 text-sm font-mono truncate break-words flex justify-between items-center hover:cursor-pointer hover:bg-gray-200 hover:font-bold" title="SELECT * FROM users">
+                                    <span class="pr-2">1.</span>
+                                    <span class="flex-1 truncate">SELECT * FROM users</span>
+                                    <span class="ml-4 text-blue-500 text-xs whitespace-nowrap">| 2024-12-06 12:34:56</span>
+                                </li>
+                                <li class="bg-gray-100 px-4 py-2 text-sm font-mono truncate break-words flex justify-between items-center hover:cursor-pointer hover:bg-gray-200 hover:font-bold" title="INSERT INTO orders (user_id, total) VALUES (1, 100);">
+                                    <span class="pr-2">2.</span>
+                                    <span class="flex-1 truncate">INSERT INTO orders (user_id, total) VALUES (1, 100);</span>
+                                    <span class="ml-4 text-blue-500 text-xs whitespace-nowrap">| 2024-12-06 12:34:56</span>
+                                </li>
+                                <li class="bg-gray-100 px-4 py-2 text-sm font-mono truncate break-words flex justify-between items-center hover:cursor-pointer hover:bg-gray-200 hover:font-bold" title="UPDATE products SET price = price * 1.1 WHERE category = 'electronics';">
+                                    <span class="pr-2">3.</span>
+                                    <span class="flex-1 truncate">UPDATE products SET price = price * 1.1 WHERE category = 'electronics';</span>
+                                    <span class="ml-4 text-blue-500 text-xs whitespace-nowrap">| 2024-12-06 12:34:56</span>
+                                </li>
+                            </ul>
+                            <button
+                            id="close-btn"
+                            class="bg-red-500 text-white px-4 py-2 mt-4 rounded hover:bg-red-600"
+                            >
+                            Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <!-- Right Bar -->
+                <div class="w-64 max-w-[300px] bg-white h-full">
+                    <h3 class="text-lg font-bold mb-2 p-2 border-1 border-bottom">Saved Queries</h3>
+                    <ul class="space-y-2 divide-y divide-solid">
+                        <li class="p-2">
+                            <div class="flex justify-between">
+                                <div class="flex">
+                                    <svg class="h-5 w-5 text-gray-500 mr-1"  width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <path d="M9 4h6a2 2 0 0 1 2 2v14l-5-3l-5 3v-14a2 2 0 0 1 2 -2" /></svg>
+                                    <a href="#" class="block text-blue-600 hover:underline text-gray-500 text-sm">Link 1</a>
+                                </div>
+                                <div class="flex">
+                                    <svg class="h-5 w-5 text-gray-500 hover:cursor-pointer hover:text-gray-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"  stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>                                  
+                                </div>
+                            </div>
+                        </li>
+                        <li class="p-2">
+                            <div class="flex justify-between">
+                                <div class="flex">
+                                    <svg class="h-5 w-5 text-gray-500 mr-1"  width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <path d="M9 4h6a2 2 0 0 1 2 2v14l-5-3l-5 3v-14a2 2 0 0 1 2 -2" /></svg>
+                                    <a href="#" class="block text-blue-600 hover:underline text-gray-500 text-sm">Link 1</a>
+                                </div>
+                                <div class="flex">
+                                    <svg class="h-5 w-5 text-gray-500 hover:cursor-pointer hover:text-gray-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"  stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>                                  
+                                </div>
+                            </div>
+                        </li>
+                        <li class="p-2">
+                            <div class="flex justify-between">
+                                <div class="flex">
+                                    <svg class="h-5 w-5 text-gray-500 mr-1"  width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">  <path stroke="none" d="M0 0h24v24H0z"/>  <path d="M9 4h6a2 2 0 0 1 2 2v14l-5-3l-5 3v-14a2 2 0 0 1 2 -2" /></svg>
+                                    <a href="#" class="block text-blue-600 hover:underline text-gray-500 text-sm">Link 1</a>
+                                </div>
+                                <div class="flex">
+                                    <svg class="h-5 w-5 text-gray-500 hover:cursor-pointer hover:text-gray-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"  stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>                                  
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            
+            </div>
+        </div>
+            
     </div>
+    
+    
 </div>
+<style>
+    .tab-button {
+        color: #4A5568; /* Gray-600 */
+        border-color: transparent;
+    }
+    .tab-button:hover {
+        color: #1A202C; /* Gray-800 */
+    }
+    .tab-button.active {
+        color: #1A202C; /* Gray-800 */
+        border-color: #3182CE; /* Blue-600 */
+    }
+    .tab-content {
+        display: none;
+    }
+    .tab-content.active {
+        display: block;
+    }
+    .bg-blue-100 {
+        background-color: #EBF8FF; /* Light Blue Background */
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const homeTab = document.getElementById("home-tab");
+        const exploreTab = document.getElementById("explore-tab");
+        const homeContent = document.getElementById("home-content");
+        const exploreContent = document.getElementById("explore-content");
+    
+        function activateTab(tab, content) {
+            document.querySelectorAll(".tab-button").forEach(button => {
+                button.classList.remove("active");
+            });
+            document.querySelectorAll(".tab-content").forEach(content => {
+                content.classList.remove("active");
+            });
+            tab.classList.add("active");
+            content.classList.add("active");
+        }
+    
+        homeTab.addEventListener("click", () => activateTab(homeTab, homeContent));
+        exploreTab.addEventListener("click", () => activateTab(exploreTab, exploreContent));
+    
+        // Set default active tab
+        activateTab(exploreTab, exploreContent);
+
+        const historyBtn = document.getElementById("history-btn");
+        const modal = document.getElementById("history-modal");
+        const closeModalBtn = document.getElementById("close-btn");
+
+        historyBtn.addEventListener("click", () => {
+            modal.classList.toggle("hidden");
+        });
+
+        closeModalBtn.addEventListener("click", () => {
+            modal.classList.add("hidden");
+        });
+
+        // Optional: Close modal when clicking outside the modal box
+        modal.addEventListener("click", (event) => {
+            if (event.target === modal) {
+            modal.classList.add("hidden");
+            }
+        });
+    });
+
+    function renderResponseChart(chart, chartId) {
+        var chart = chart;
+        // Create the HTML structure as a template literal
+        return `
+            <div class="bg-white shadow-md rounded-lg p-4">
+                <div id="chart-container${chartId}" style="width: 80%; margin: auto;">
+                    <h3 class="text-center font-bold text-md mb-4">${chart.title}</h3>
+                    <canvas id="chart${chartId}"></canvas>
+                    <div id="chart${chartId}-nc"></div>
+                    <div id="single-value-container${chartId}" style="display: none;"></div>
+                </div>
+            </div>
+        `;
+    }
+
+    async function handleSearchQuery(event) {
+        showResponseLoader(); // Show the loader
+        event.preventDefault(); // Prevent the form's default submission
+
+        const form = document.getElementById("search_query_form");
+        const input = document.getElementById("search_query_input");
+        const responseContainer = document.getElementById("query-response-cont");
+        const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]").value;
+
+        const query = input.value;
+
+        try {
+            const response = await fetch("search_query/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken, // Include the CSRF token
+                },
+                body: JSON.stringify({ search_query: query }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const responseData = await response.json();
+            const chartData = responseData.data;
+
+            // Clear existing content in the response container
+            responseContainer.innerHTML = "";
+
+            // Add a card for the response data
+            const responseCard = document.createElement("div");
+            responseCard.className =
+                "w-full p-4 bg-white rounded-md shadow-md mb-4 border border-gray-200";
+
+            const chartId = Math.random().toString(36).slice(-5);
+            // Format response data as HTML
+            responseCard.innerHTML = renderResponseChart(chartData, chartId);
+
+            // Append the card to the response container
+            responseContainer.appendChild(responseCard);
+            
+            renderChart("chart"+chartId,chartData.data);
+        } catch (error) {
+            console.error("Error submitting search query:", error);
+
+            // Display an error message in the response container
+            responseContainer.innerHTML = `
+                <div class="w-full p-4 bg-red-100 rounded-md shadow-md border border-red-300 text-red-700">
+                    <strong>Error:</strong> Unable to fetch search results. Please try again later.
+                </div>
+            `;
+        } finally {
+            removeResponseLoader(); // Remove the loader
+        }
+    }
+
+   // Function to add a loader card
+    function showResponseLoader() {
+        const container = document.getElementById("query-response-cont");
+
+        // Create the loader card
+        const loaderCard = document.createElement("div");
+        loaderCard.id = "response-loader";
+        loaderCard.className =
+            "w-full p-4 rounded-md bg-gray-100 flex items-center justify-center shadow-md";
+
+        // Add loader content (e.g., spinner or animation)
+        loaderCard.innerHTML = `
+            <svg class="animate-spin h-8 w-8 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 2.042.684 3.93 1.816 5.445l2.184-2.154z"></path>
+            </svg>
+            <span class="ml-4 text-gray-600 text-sm">Loading, please wait...</span>
+        `;
+
+        // Append the loader card to the container
+        container.appendChild(loaderCard);
+    }
+
+    // Function to remove all loaders
+    function removeResponseLoader() {
+        const container = document.getElementById("response-loader");
+        container.style.display = "None"; // Clear all child elements
+    }
+</script>    
 {% endblock %}

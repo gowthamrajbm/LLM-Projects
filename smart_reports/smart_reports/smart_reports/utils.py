@@ -25,10 +25,14 @@ class Utils:
                 columns = [col[0] for col in cursor.description]  # Get column names
                 
                 # Ensure the required columns exist
-                if chart_type != "single value":
+                if chart_type not in ["single value", "table"] :
                     if (label_column not in columns or value_column not in columns):
                         raise ValueError("Specified label_column or value_column not in query results")
-                else:
+                else:      
+                    if(len(rows) == 0):
+                        data = []              
+                    else:
+                        data = rows if chart_type == "table" else [rows[0][0]]
                     return {
                         'type': chart_type,
                         'data': {
@@ -36,7 +40,7 @@ class Utils:
                             'datasets': [
                                 {
                                     'label': 'Dataset',
-                                    'data': [rows[0][0]],
+                                    'data': data,
                                     'backgroundColor': [],
                                     'borderColor': [],
                                 }
@@ -49,6 +53,22 @@ class Utils:
                     'type': chart_type,
                     'data': {
                         'labels': [],
+                        'datasets': []
+                    }
+                }
+
+                if chart_type == 'table':
+                    chart_data['data'] = {
+                        'labels': [],  # column headers
+                        'datasets': [
+                            {
+                                'data': []  # data rows
+                            }
+                        ]
+                    }
+                else:
+                    chart_data['data'] = {
+                        'labels': [],
                         'datasets': [
                             {
                                 'label': 'Dataset',
@@ -58,8 +78,12 @@ class Utils:
                             }
                         ]
                     }
-                }
-                
+
+                if chart_type == 'table':
+                    chart_data['data']['labels'] = columns
+                    chart_data['data']['datasets'][0]['data'] = rows
+                    return chart_data
+
                 # Fill in the labels and data
                 for row in rows:
                     chart_data['data']['labels'].append(row[columns.index(label_column)])
@@ -82,6 +106,7 @@ class Utils:
                 return chart_data
         
         except Exception as e:
+            print(e)
             return {'error': str(e)}
 
 if __name__ == "__main__":
